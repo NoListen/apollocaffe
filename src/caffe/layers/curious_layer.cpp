@@ -42,9 +42,9 @@ void CuriousLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
   return;
 }
-// #ifdef CPU_ONLY
-// STUB_GPU(CuriousLayer);
-// #endif
+#ifdef CPU_ONLY
+STUB_GPU(CuriousLayer);
+#endif
 
 INSTANTIATE_CLASS(CuriousLayer);
 REGISTER_LAYER_CLASS(Curious);

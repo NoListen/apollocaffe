@@ -641,11 +641,11 @@ class BaseCuriousLayer : public Layer<Dtype> {
   void forward_cpu_gemm(const Dtype* input, const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col = false); 
   void forward_cpu_bias(Dtype* output, const Dtype* bias);
 
-// #ifndef CPU_ONLY
-//   void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
-//       Dtype* output, bool skip_im2col = false);
-//   void forward_gpu_bias(Dtype* output, const Dtype* bias);
-// #endif
+#ifndef CPU_ONLY
+  void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
+      Dtype* output, bool skip_im2col = false);
+  void forward_gpu_bias(Dtype* output, const Dtype* bias);
+#endif
 
   // reverse_dimensions should return true iff we are implementing deconv, so
   // that conv helpers know which dimensions are which.
@@ -671,12 +671,12 @@ class BaseCuriousLayer : public Layer<Dtype> {
     im2col_cpu(data, K, conv_in_height_, conv_in_width_,
         kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, col_buff);
   }
-// #ifndef CPU_ONLY
-//   inline void curious_im2col_gpu(const Dtype* data, Dtype* col_buff) {
-//     im2col_gpu(data, K, conv_in_height_, conv_in_width_,
-//         kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, col_buff);
-//   }
-// #endif
+#ifndef CPU_ONLY
+  inline void curious_im2col_gpu(const Dtype* data, Dtype* col_buff) {
+    im2col_gpu(data, K, conv_in_height_, conv_in_width_,
+        kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, col_buff);
+  }
+#endif
 
   int conv_out_channels_;
   int conv_in_channels_;
@@ -739,8 +739,8 @@ class CuriousLayer : public BaseCuriousLayer<Dtype> {
       const vector<Blob<Dtype>*>& top);
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  // virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-  //     const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
   virtual inline bool reverse_dimensions() { return false; }
   virtual void compute_output_shape();
 };
