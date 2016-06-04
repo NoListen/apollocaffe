@@ -214,7 +214,7 @@ void BaseCuriousLayer<Dtype>::forward_cpu_bias(Dtype* output,
       (Dtype)1., output);
 }
 
-// #ifndef CPU_ONLY
+#ifndef CPU_ONLY
 
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
@@ -249,7 +249,6 @@ void BaseCuriousLayer<Dtype>::forward_gpu_bias(Dtype* output,
       height_out_ * width_out_, 1, (Dtype)1., bias, bias_multiplier_.gpu_data(),
       (Dtype)1., output);
 }
-
 
 #endif  // !CPU_ONLY
 

@@ -638,12 +638,13 @@ class BaseCuriousLayer : public Layer<Dtype> {
   // Helper functions that abstract away the column buffer and gemm arguments.
   // The last argument in forward_cpu_gemm is so that we can skip the im2col if
   // we just called weight_cpu_gemm with the same input.
-  void forward_cpu_gemm(const Dtype* input, const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col = false); 
+  void forward_cpu_gemm(const Dtype* input, const Dtype* quantized_book, 
+    const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col = false); 
   void forward_cpu_bias(Dtype* output, const Dtype* bias);
 
 #ifndef CPU_ONLY
-  void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
-      Dtype* output, bool skip_im2col = false);
+  void forward_gpu_gemm(const Dtype* input, const Dtype* quantized_book, 
+    const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col = false); 
   void forward_gpu_bias(Dtype* output, const Dtype* bias);
 #endif
 
