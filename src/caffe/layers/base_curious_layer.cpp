@@ -87,12 +87,18 @@ void BaseCuriousLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     //>--------------------------------------------------------------------------------
 
-    Cs = 4;
+    Cs = 8;
     Ct = num_output_;
     M = channels_  / Cs;
-    K = 32;
+    K = 128;
 
-    this->blobs_[0].reset(new Blob<Dtype>(M,Cs,1,K));// target
+    vector<int> book_shape_;
+    book_shape_.push_back(M);
+    book_shape_.push_back(K);
+    book_shape_.push_back(Cs);
+    
+    // this->blobs_[0].reset(new Blob<Dtype>(M,Cs,K));// target
+    this->blobs_[0].reset(new Blob<Dtype>(book_shape_));// target
     this->blobs_[1].reset(new Blob<Dtype>(M,Ct,K,kernel_h_*kernel_w_));
 
     // If necessary, initialize and fill the biases.
@@ -184,12 +190,15 @@ void BaseCuriousLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
     const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col) {
-  const Dtype* col_buff = input;
   Dtype is_begin_ = 0.;
+  const Dtype* col_buff = input;
+  
 // at first generate lookuptable
   // Get the lu_table
   for (int m = 0; m < M; ++m)
   {
+    col_buff = input;
+
     caffe_cpu_gemm(CblasNoTrans, CblasNoTrans, K, 
       height_*width_, Cs, (Dtype)1.,quantized_book + m * book_offset_, 
       col_buff + m*input_offset_,(Dtype)0.,lu_table+lu_table_offset_*m);
@@ -225,6 +234,8 @@ void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
   // Get the lu_table
   for (int m = 0; m < M; ++m)
   {
+    col_buff = input;
+
     caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, K, 
       height_*width_, Cs, (Dtype)1.,quantized_book + m * book_offset_, 
       col_buff + m*input_offset_,(Dtype)0.,lu_table+lu_table_offset_*m);
