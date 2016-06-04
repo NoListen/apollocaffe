@@ -29,6 +29,12 @@ void CuriousLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   }
 }
 
+template <typename Dtype>
+void CuriousLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+      return;
+}
+
 
 INSTANTIATE_LAYER_GPU_FUNCS(CuriousLayer);
 
