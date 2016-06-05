@@ -78,19 +78,21 @@ void BaseCuriousLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     LOG(INFO) << "Skipping parameter initialization";
   } else {
     if (bias_term_) {
-      this->blobs_.resize(4); // book + indicator + lu_table + bias
+      this->blobs_.resize(3); // book + indicator + lu_table + bias
     } else {
-      this->blobs_.resize(3);
+      this->blobs_.resize(2);
     }
     //remain to change
   //#############################################
 
     //>--------------------------------------------------------------------------------
 
-    Cs = 8;
+    Cs = curious_param.cs(); //8
+    CHECK_EQ(channels_ % Cs, 0);
+
     Ct = num_output_;
     M = channels_  / Cs;
-    K = 128;
+    K = curious_param.k(); // 128
 
     vector<int> book_shape_;
     book_shape_.push_back(M);
@@ -104,10 +106,10 @@ void BaseCuriousLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     // If necessary, initialize and fill the biases.
     if (bias_term_) {
       vector<int> bias_shape(1, num_output_);
-      this->blobs_[3].reset(new Blob<Dtype>(bias_shape));
+      this->blobs_[2].reset(new Blob<Dtype>(bias_shape));
       shared_ptr<Filler<Dtype> > bias_filler(GetFiller<Dtype>(
           this->layer_param_.curious_param().bias_filler()));
-      bias_filler->Fill(this->blobs_[3].get());
+      bias_filler->Fill(this->blobs_[2].get());
     }
   }
   // Propagate gradients to the parameters (as directed by backward pass).
@@ -166,7 +168,7 @@ void BaseCuriousLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 
 //##################################################
 
-  this->blobs_[2].reset(new Blob<Dtype>(M,K,height_,width_)); // target, too
+  lu_table.reset(new Blob<Dtype>(M,K,height_,width_)); // target, too
 
 //##################################################
 
@@ -192,7 +194,7 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
     const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col) {
   Dtype is_begin_ = 0.;
   const Dtype* col_buff = input;
-  
+
 // at first generate lookuptable
   // Get the lu_table
   for (int m = 0; m < M; ++m)
