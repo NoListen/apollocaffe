@@ -99,9 +99,14 @@ void BaseCuriousLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     book_shape_.push_back(K);
     book_shape_.push_back(Cs);
     
+    vector<int> indicator_shape;
+    indicator_shape.push_back(M);
+    indicator_shape.push_back(Ct);
+    indicator_shape.push_back(kernel_h_*kernel_h_);
+
     // this->blobs_[0].reset(new Blob<Dtype>(M,Cs,K));// target
     this->blobs_[0].reset(new Blob<Dtype>(book_shape_));// target
-    this->blobs_[1].reset(new Blob<Dtype>(M,Ct,K,kernel_h_*kernel_w_));
+    this->blobs_[1].reset(new Blob<Dtype>(indicator_shape));
 
     // If necessary, initialize and fill the biases.
     if (bias_term_) {
@@ -159,12 +164,14 @@ void BaseCuriousLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   weight_offset_ = conv_out_channels_ * kernel_dim_ / group_ / group_;
   col_offset_ = kernel_dim_ * conv_out_spatial_dim_ / group_;
   output_offset_ = conv_out_channels_ * conv_out_spatial_dim_ / group_;
-  
+  // sub_output_offset_ = conv_out_spatial_dim_;
+
   book_offset_  = K * Cs;
   input_offset_ = Cs * height_ * width_;
   lu_table_offset_ = K * height_ * width_;
   lu_dim_ = K * kernel_h_ * kernel_w_;
-  indicator_offset_ = Ct * K * kernel_h_ * kernel_w_;
+  indicator_offset_ = Ct *  kernel_h_ * kernel_w_;
+  kernel_count = kernel_h_*kernel_w_;
 
 //##################################################
 
@@ -192,11 +199,19 @@ void BaseCuriousLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
     const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col) {
-  Dtype is_begin_ = 0.;
+  // Dtype is_begin_ = 0.;
   const Dtype* col_buff = input;
 
 // at first generate lookuptable
   // Get the lu_table
+  // for (int i = 0; i < Ct; ++i)
+  // {
+  //   Dtype * start_point = (output + i*conv_out_spatial_dim_);
+  //   for (int j = 0; j < conv_out_spatial_dim_; ++j)
+  //   {
+  //     *(start_point + j) = 0;
+  //   }
+  // }
   for (int m = 0; m < M; ++m)
   {
     col_buff = input;
@@ -211,15 +226,55 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
       col_buff = col_buffer_.cpu_data();
     }
 
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
-     conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
-    is_begin_ = 1.;
+    const Dtype* indicator_subspace = quantized_indicator + m*indicator_offset_;
+    for (int i = 0; i  < Ct; ++i)
+    {
+      Dtype * start_point = (output + i*conv_out_spatial_dim_);
+      // ith row
+      const Dtype * start_indicator  = (indicator_subspace + i*kernel_count);
+
+      for (int j = 0; j < kernel_h_*kernel_w_ ; ++j) // one by one
+      {
+        const Dtype* start_col = col_buff + (int(*(start_indicator + j))*kernel_count + j) *conv_out_spatial_dim_;
+        for (int k = 0; k < conv_out_spatial_dim_; ++k)
+        {
+          start_point[k] += start_col[k];
+        }
+      }
+    }
+    // if (m == 1)
+    // {
+    //   LOG(INFO)<<"first row of the indicator in the first subspace\n";
+    //   for (int i = 0; i < kernel_w_*kernel_w_; ++i)
+    //     LOG(INFO)<< indicator_subspace[i]<<'\n';
+    //   LOG(INFO)<<"\nfirst column of the look up table in the first subspace\n";
+    //   for (int i = 0; i < lu_dim_; ++i)
+    //     LOG(INFO)<< *(col_buff + i*conv_out_spatial_dim_)<<'\n';
+    //   LOG(INFO)<<"\nfirst element of output in the first subspace\n";
+    //   for (int i = 0; i < conv_out_spatial_dim_; ++i)
+    //     LOG(INFO)<<*(output+i);
+    // }
+    // // // caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
+     // conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
+    // is_begin_ = 1.;
   }
+  // LOG(INFO)<<"res";
+  // for (int s = 0; s < Ct; ++s)
+  // {
+  //   Dtype *start_point = output + s*conv_out_spatial_dim_;
+  //   for (int i = 0; i < conv_out_spatial_dim_; ++i)
+  //       LOG(INFO)<<*(start_point+i);
+  //     // LOG(INFO)<<conv_out_spatial_dim_;
+  // }
 }
 
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_cpu_bias(Dtype* output,
     const Dtype* bias) {
+  for (int i = 0; i < Ct; ++i)
+  {
+    LOG(INFO)<<bias[i];
+  }
   caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
       height_out_ * width_out_, 1, (Dtype)1., bias, bias_multiplier_.cpu_data(),
       (Dtype)1., output);
@@ -231,7 +286,7 @@ template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
     const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col) {
   const Dtype* col_buff = input;
-  Dtype is_begin_ = 0.;
+  // Dtype is_begin_ = 0.;
 // at first generate lookuptable
   // Get the lu_table
   for (int m = 0; m < M; ++m)
@@ -248,9 +303,25 @@ void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
       col_buff = col_buffer_.gpu_data();
     }
 
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
-     conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
-    is_begin_ = 1.;
+    // caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
+    //  conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
+    // is_begin_ = 1.;
+    const Dtype* indicator_subspace = quantized_indicator + m*indicator_offset_;
+
+    for (int i = 0; i  < Ct; ++i)
+    {
+      Dtype * start_point = (output + i*conv_out_spatial_dim_);
+      // ith row
+      const Dtype * start_indicator  = (indicator_subspace + i*kernel_h_*kernel_w_);
+      for (int j = 0; j < kernel_h_*kernel_w_ ; ++j) // one by one
+      {
+        const Dtype* start_col = col_buff + (int(*(start_indicator + j)) + j*K) *conv_out_spatial_dim_;
+        for (int k = 0; k < conv_out_spatial_dim_; ++k)
+        {
+          *(start_point+k) += *(start_col + k);
+        }
+      }
+    }
   }
 }
 

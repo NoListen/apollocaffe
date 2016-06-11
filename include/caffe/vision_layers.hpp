@@ -656,6 +656,7 @@ class BaseCuriousLayer : public Layer<Dtype> {
 
   int kernel_h_, kernel_w_;
   int stride_h_, stride_w_;
+  int kernel_count;
   int num_;
   int channels_;
   int pad_h_, pad_w_;

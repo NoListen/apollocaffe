@@ -26,12 +26,16 @@ void CuriousLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->cpu_data();
     Dtype* top_data = top[i]->mutable_cpu_data();
+
     for (int n = 0; n < this->num_; ++n) {
       this->forward_cpu_gemm(bottom_data + bottom[i]->offset(n), quantized_book, quantized_indicatior,
-      	lu_table_pointer, top_data + top[i]->offset(n));
+        lu_table_pointer, top_data + top[i]->offset(n));
       if (this->bias_term_) {
-        const Dtype* bias = this->blobs_[1]->cpu_data();
+        LOG(INFO)<<(top_data[0]);
+        const Dtype* bias = this->blobs_[2]->cpu_data();
         this->forward_cpu_bias(top_data + top[i]->offset(n), bias);
+        LOG(INFO)<<(top_data[0]);
+
       }
     }
   }
