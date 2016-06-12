@@ -204,14 +204,14 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
 
 // at first generate lookuptable
   // Get the lu_table
-  // for (int i = 0; i < Ct; ++i)
-  // {
-  //   Dtype * start_point = (output + i*conv_out_spatial_dim_);
-  //   for (int j = 0; j < conv_out_spatial_dim_; ++j)
-  //   {
-  //     *(start_point + j) = 0;
-  //   }
-  // }
+  for (int i = 0; i < Ct; ++i)
+  {
+    Dtype * start_point = (output + i*conv_out_spatial_dim_);
+    for (int j = 0; j < conv_out_spatial_dim_; ++j)
+    {
+      *(start_point + j) = 0;
+    }
+  }
   for (int m = 0; m < M; ++m)
   {
     col_buff = input;
@@ -233,48 +233,24 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
       // ith row
       const Dtype * start_indicator  = (indicator_subspace + i*kernel_count);
 
-      for (int j = 0; j < kernel_h_*kernel_w_ ; ++j) // one by one
+      for (int j = 0; j < kernel_count ; ++j) // one by one
       {
-        const Dtype* start_col = col_buff + (int(*(start_indicator + j))*kernel_count + j) *conv_out_spatial_dim_;
+        const Dtype* start_col = col_buff + (int(*(start_indicator + j)) * kernel_count + j) *conv_out_spatial_dim_;
         for (int k = 0; k < conv_out_spatial_dim_; ++k)
         {
           start_point[k] += start_col[k];
         }
       }
-    }
-    // if (m == 1)
-    // {
-    //   LOG(INFO)<<"first row of the indicator in the first subspace\n";
-    //   for (int i = 0; i < kernel_w_*kernel_w_; ++i)
-    //     LOG(INFO)<< indicator_subspace[i]<<'\n';
-    //   LOG(INFO)<<"\nfirst column of the look up table in the first subspace\n";
-    //   for (int i = 0; i < lu_dim_; ++i)
-    //     LOG(INFO)<< *(col_buff + i*conv_out_spatial_dim_)<<'\n';
-    //   LOG(INFO)<<"\nfirst element of output in the first subspace\n";
-    //   for (int i = 0; i < conv_out_spatial_dim_; ++i)
-    //     LOG(INFO)<<*(output+i);
-    // }
-    // // // caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
+  }
+    // // caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
      // conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
     // is_begin_ = 1.;
   }
-  // LOG(INFO)<<"res";
-  // for (int s = 0; s < Ct; ++s)
-  // {
-  //   Dtype *start_point = output + s*conv_out_spatial_dim_;
-  //   for (int i = 0; i < conv_out_spatial_dim_; ++i)
-  //       LOG(INFO)<<*(start_point+i);
-  //     // LOG(INFO)<<conv_out_spatial_dim_;
-  // }
 }
 
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_cpu_bias(Dtype* output,
     const Dtype* bias) {
-  for (int i = 0; i < Ct; ++i)
-  {
-    LOG(INFO)<<bias[i];
-  }
   caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
       height_out_ * width_out_, 1, (Dtype)1., bias, bias_multiplier_.cpu_data(),
       (Dtype)1., output);
