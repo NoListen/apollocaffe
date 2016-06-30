@@ -160,6 +160,9 @@ void caffe_gpu_gemm(const CBLAS_TRANSPOSE TransA,
     Dtype* C);
 
 template <typename Dtype>
+void caffe_gpu_lu(const Dtype* a, const Dtype* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, Dtype* c);
+
+template <typename Dtype>
 void caffe_gpu_gemv(const CBLAS_TRANSPOSE TransA, const int M, const int N,
     const Dtype alpha, const Dtype* A, const Dtype* x, const Dtype beta,
     Dtype* y);

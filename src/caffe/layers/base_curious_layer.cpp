@@ -5,6 +5,11 @@
 #include "caffe/util/im2col.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
+#include <pthread.h>
+// extern "C" void caffe_gpu_lu(const Dtype* a, const Dtype* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, Dtype* c);
+
+// template <typename Dtype>
+// extern "C" void caffe_gpu_lu(const Dtype* a, const Dtype* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, Dtype* c);
 
 namespace caffe {
 
@@ -204,14 +209,7 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
 
 // at first generate lookuptable
   // Get the lu_table
-  for (int i = 0; i < Ct; ++i)
-  {
-    Dtype * start_point = (output + i*conv_out_spatial_dim_);
-    for (int j = 0; j < conv_out_spatial_dim_; ++j)
-    {
-      *(start_point + j) = 0;
-    }
-  }
+
   for (int m = 0; m < M; ++m)
   {
     col_buff = input;
@@ -242,9 +240,6 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
         }
       }
   }
-    // // caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
-     // conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
-    // is_begin_ = 1.;
   }
 }
 
@@ -261,10 +256,8 @@ void BaseCuriousLayer<Dtype>::forward_cpu_bias(Dtype* output,
 template <typename Dtype>
 void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
     const Dtype* quantized_book, const Dtype* quantized_indicator, Dtype* lu_table, Dtype* output, bool skip_im2col) {
-  const Dtype* col_buff = input;
   // Dtype is_begin_ = 0.;
-// at first generate lookuptable
-  // Get the lu_table
+  const Dtype* col_buff = input;
   for (int m = 0; m < M; ++m)
   {
     col_buff = input;
@@ -279,25 +272,10 @@ void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
       col_buff = col_buffer_.gpu_data();
     }
 
-    // caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, Ct, 
-    //  conv_out_spatial_dim_,lu_dim_, (Dtype)1. , quantized_indicator + m * indicator_offset_, col_buff, is_begin_,output);
-    // is_begin_ = 1.;
     const Dtype* indicator_subspace = quantized_indicator + m*indicator_offset_;
 
-    for (int i = 0; i  < Ct; ++i)
-    {
-      Dtype * start_point = (output + i*conv_out_spatial_dim_);
-      // ith row
-      const Dtype * start_indicator  = (indicator_subspace + i*kernel_h_*kernel_w_);
-      for (int j = 0; j < kernel_h_*kernel_w_ ; ++j) // one by one
-      {
-        const Dtype* start_col = col_buff + (int(*(start_indicator + j)) + j*K) *conv_out_spatial_dim_;
-        for (int k = 0; k < conv_out_spatial_dim_; ++k)
-        {
-          *(start_point+k) += *(start_col + k);
-        }
-      }
-    }
+    LOG(INFO)<<"before computation";
+    caffe_gpu_lu(indicator_subspace, lu_table, Ct, K, lu_dim_, conv_out_spatial_dim_, K, output);
   }
 }
 

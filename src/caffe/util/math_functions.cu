@@ -8,9 +8,66 @@
 #include <cstring>
 
 #include "caffe/common.hpp"
+#include <cuda_runtime.h>
+
 #include "caffe/util/math_functions.hpp"
+#define NUM_THREADS 64
+
+
 
 namespace caffe {
+
+template <typename Dtype>
+__global__ void matMultCUDA(const Dtype* a, size_t a_nc, const Dtype* b, size_t b_nc, Dtype* c, int K)  
+{  
+    const int tid = threadIdx.x;  
+    const int bidr = blockIdx.x;  
+    const int bidc = blockIdx.y;
+
+    int idx = a[bidr*a_nc + bidc];
+    int addidx = idx*K + bidr;
+    int  j;  
+    
+    for(j = tid; j < b_nc; j += blockDim.x) {
+      c[bidr * b_nc + j] += b[addidx*b_nc + j];  
+  }
+}
+
+template <typename Dtype>
+void matMult(const Dtype* a, const Dtype* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, Dtype* c)
+{  
+    //Dtype *ac, *bc, *cc;
+
+    // cudaMalloc((void**) &ac, sizeof(Dtype) * a_nr * a_nc);   
+    // cudaMalloc((void**) &bc, sizeof(Dtype) * b_nr * b_nc);  
+    // c become the result
+
+    //ac is the indicatior
+    //bc is the look_up table
+
+    // cudaMemcpy2D(ac, sizeof(Dtype) * a_nc, a, sizeof(Dtype) * a_nc, sizeof(Dtype) * a_nc, a_nr, cudaMemcpyHostToDevice);  
+    // cudaMemcpy2D(bc, sizeof(Dtype) * b_nc, b, sizeof(Dtype) * b_nc, sizeof(Dtype) * a_nc, b_nr, cudaMemcpyHostToDevice);  
+  
+    // int blocks = a_nr * a_nc;
+    dim3 blocks(a_nr, a_nc);
+    matMultCUDA<<<blocks, NUM_THREADS>>>(a, a_nc, b, b_nc, c, K);  
+  
+    // cudaMemcpy2D(c, sizeof(Dtype) * b_nc, cc, sizeof(Dtype) * n, sizeof(Dtype) * n, n, cudaMemcpyDeviceToHost);
+    
+};
+
+template <>
+void caffe_gpu_lu(const float* a, const float* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, float* c)
+{
+    matMult(a, b, a_nr, a_nc, b_nr, b_nc, K, c);
+}
+
+template <>
+void caffe_gpu_lu(const double* a, const double* b, int a_nr,  int a_nc, int b_nr, int b_nc, int K, double* c)
+{
+    matMult(a, b, a_nr, a_nc, b_nr, b_nc, K, c);
+}
+
 
 template <>
 void caffe_gpu_transpose<float>(const int M, const int N,
@@ -27,6 +84,7 @@ void caffe_gpu_transpose<float>(const int M, const int N,
   CUBLAS_CHECK(cublasSgeam(Caffe::cublas_handle(), CUBLAS_OP_T, CUBLAS_OP_N,
       M, N, &alpha, A, lda, &beta, NULL, ldb, C, ldc));
 }
+
 
 template <>
 void caffe_gpu_transpose<double>(const int M, const int N,

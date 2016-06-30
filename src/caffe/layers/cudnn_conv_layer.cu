@@ -6,6 +6,9 @@
 #include "caffe/util/im2col.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
+#include <cuda_runtime.h>
+
+
 
 namespace caffe {
 
