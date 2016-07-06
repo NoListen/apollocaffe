@@ -107,7 +107,7 @@ void BaseCuriousLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     vector<int> indicator_shape;
     indicator_shape.push_back(M);
     indicator_shape.push_back(Ct);
-    indicator_shape.push_back(kernel_h_*kernel_h_);
+    indicator_shape.push_back(kernel_h_*kernel_w_);
 
     // this->blobs_[0].reset(new Blob<Dtype>(M,Cs,K));// target
     this->blobs_[0].reset(new Blob<Dtype>(book_shape_));// target
@@ -217,8 +217,11 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
     caffe_cpu_gemm(CblasNoTrans, CblasNoTrans, K, 
       height_*width_, Cs, (Dtype)1.,quantized_book + m * book_offset_, 
       col_buff + m*input_offset_,(Dtype)0.,lu_table+lu_table_offset_*m);
+  }
 
-    col_buff = lu_table + m*lu_dim_;
+  for (int m = 0; m < M; ++m)
+  {
+    col_buff = lu_table + m * lu_table_offset_;
     if (!is_1x1_) {
       curious_im2col_cpu(lu_table + m*lu_table_offset_, col_buffer_.mutable_cpu_data());
       col_buff = col_buffer_.cpu_data();
@@ -234,12 +237,41 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
       for (int j = 0; j < kernel_count ; ++j) // one by one
       {
         const Dtype* start_col = col_buff + (int(*(start_indicator + j)) * kernel_count + j) *conv_out_spatial_dim_;
-        for (int k = 0; k < conv_out_spatial_dim_; ++k)
-        {
-          start_point[k] += start_col[k];
-        }
+        // for (int k = 0; k < conv_out_spatial_dim_; ++k)
+        // {
+        //   start_point[k] += start_col[k];
+        // }
+        caffe_axpy(conv_out_spatial_dim_, (Dtype)1., start_col ,start_point);
       }
-  }
+    }
+
+    // int height_col = (height_ + 2 * pad_h_ - kernel_h_) / stride_h_ + 1;
+    // int width_col = (width_ + 2 * pad_w_ - kernel_w_) / stride_w_ + 1;
+    //assume m is fixed
+    // for (int c = 0; c < kernel_count; ++c)
+    // {
+    //   int w_offset = c % kernel_w_;
+    //   int h_offset = c / kernel_w_;
+    //   const Dtype * indicator_c = indicator_subspace + c*Ct;
+
+    //   for (int h = 0; h < height_col; ++h)
+    //     for (int w = 0; w < width_col; ++w)
+    //     {
+    //       int h_pad = h * stride_h_ - pad_h_ + h_offset;
+    //       int w_pad = w * stride_w_ - pad_w_ + w_offset;
+    //       if (h_pad >= 0 && h_pad <= height_ && w_pad >= 0 && w_pad <= width_)
+    //       {
+    //         // what does the book look like
+    //         // Ct by Kernel_count
+    //         // I can change the kernel_count into Kernel_count by Ct
+    //         // assume changed!
+    //         for (int k = 0; k < Ct; ++k)
+    //         {
+    //           output[(k * height_col + h) * width_col + w] += col_buff[int(indicator_c[k]) * conv_out_spatial_dim_ + h_pad * width_ + w_pad];
+    //         }
+    //       }
+    //     }
+    // }
   }
 }
 
