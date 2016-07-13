@@ -233,14 +233,9 @@ void BaseCuriousLayer<Dtype>::forward_cpu_gemm(const Dtype* input,
       Dtype * start_point = (output + i*conv_out_spatial_dim_);
       // ith row
       const Dtype * start_indicator  = (indicator_subspace + i*kernel_count);
-
       for (int j = 0; j < kernel_count ; ++j) // one by one
       {
-        const Dtype* start_col = col_buff + (int(*(start_indicator + j)) * kernel_count + j) *conv_out_spatial_dim_;
-        // for (int k = 0; k < conv_out_spatial_dim_; ++k)
-        // {
-        //   start_point[k] += start_col[k];
-        // }
+        const Dtype* start_col = col_buff + int(*(start_indicator + j));
         caffe_axpy(conv_out_spatial_dim_, (Dtype)1., start_col ,start_point);
       }
     }
