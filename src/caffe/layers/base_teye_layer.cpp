@@ -60,9 +60,9 @@ void BaseTeyeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       && stride_h_ == 1 && stride_w_ == 1 && pad_h_ == 0 && pad_w_ == 0;
   // Configure output channels and groups.
   channels_ = bottom[0]->channels();
-  num_output_ = this->layer_param_.convolution_param().num_output();
+  num_output_ = this->layer_param_.teye_param().num_output();
   CHECK_GT(num_output_, 0);
-  group_ = this->layer_param_.convolution_param().group();
+  group_ = this->layer_param_.teye_param().group();
   CHECK_EQ(channels_ % group_, 0);
   CHECK_EQ(num_output_ % group_, 0)
       << "Number of output should be multiples of group.";
@@ -91,9 +91,10 @@ void BaseTeyeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     shrink_weight_shape_.push_back(conv_out_channels_);
     shrink_weight_shape_.push_back(kmap_length_);
     this->blobs_[0].reset(new Blob<Dtype>(shrink_weight_shape_));
+    this->blobs_[1].reset(new Blob<Dtype>(1,1,1,kmap_length_));
     // if cannot work, eliminate it
     shared_ptr<Filler<Dtype> > weight_filler(GetFiller<Dtype>(
-        this->layer_param_.convolution_param().weight_filler()));
+        this->layer_param_.teye_param().weight_filler()));
     weight_filler->Fill(this->blobs_[0].get());
 
     // If necessary, initialize and fill the biases.
@@ -101,8 +102,8 @@ void BaseTeyeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       vector<int> bias_shape(1, num_output_);
       this->blobs_[2].reset(new Blob<Dtype>(bias_shape));
       shared_ptr<Filler<Dtype> > bias_filler(GetFiller<Dtype>(
-          this->layer_param_.convolution_param().bias_filler()));
-      bias_filler->Fill(this->blobs_[1].get());
+          this->layer_param_.teye_param().bias_filler()));
+      bias_filler->Fill(this->blobs_[2].get());
     }
   }
   // Propagate gradients to the parameters (as directed by backward pass).

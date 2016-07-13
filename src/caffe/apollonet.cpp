@@ -301,6 +301,7 @@ void ApolloNet<Dtype>::AddLayerParams(shared_ptr<Layer<Dtype> > layer) {
   const LayerParameter& layer_param = layer->layer_param();
   const int param_size = layer_param.param_size();
   const string& layer_name = layer_param.name();
+  LOG(INFO)<<param_size<<' '<<layer->blobs().size();
   if (param_size > 0) {
     // new layer has explitily named it's params
     ASSERT(param_size == layer->blobs().size(), "Layer: '"
