@@ -92,6 +92,9 @@ void BaseTeyeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     shrink_weight_shape_.push_back(kmap_length_);
     this->blobs_[0].reset(new Blob<Dtype>(shrink_weight_shape_));
     this->blobs_[1].reset(new Blob<Dtype>(1,1,1,kmap_length_));
+    Dtype * kernel_map  = this->blobs_[1]->mutable_cpu_data();
+    for (int k = 0; k < kmap_length_; ++k)
+      kernel_map[k] = k;
     // if cannot work, eliminate it
     shared_ptr<Filler<Dtype> > weight_filler(GetFiller<Dtype>(
         this->layer_param_.teye_param().weight_filler()));
@@ -108,6 +111,53 @@ void BaseTeyeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   }
   // Propagate gradients to the parameters (as directed by backward pass).
   this->param_propagate_down_.resize(this->blobs_.size(), true);
+  LOG(INFO)<<"Building";
+
+}
+
+template <typename Dtype>
+void BaseTeyeLayer<Dtype>::compute_ks(const Dtype *kernel_map)
+{
+  int *kd = kernel_distri_.mutable_cpu_data();
+  int *ka = kernel_asum_.mutable_cpu_data();
+
+  int kernel_dim = kernel_w_ * kernel_h_;
+  int channel_idx = 0;
+  int up_limit = kernel_dim;
+  LOG(INFO)<<"KERNEL_DIM "<<kernel_dim;
+  LOG(INFO)<<"KMAP_LENGTH "<<kmap_length_;
+  LOG(INFO)<<"up_limit "<<up_limit;
+  caffe_set(conv_in_channels_, int(0), kd);
+  for (int i = 0; i < kmap_length_; ++i)
+  {
+    if (kernel_map[i] < up_limit)
+    {
+      kd[channel_idx] += 1;
+    }
+    else
+    {
+      up_limit += kernel_dim;
+      channel_idx += 1;
+      while (kernel_map[i] >= up_limit)
+      {
+        up_limit += kernel_dim;
+        channel_idx += 1;
+      }
+      //add in this way, otherwise lose it.
+      kd[channel_idx] += 1;
+    }
+  }
+  ka[0] = 0;
+  LOG(INFO)<<"loading";
+  for (int i = 1; i < conv_in_channels_; ++i)
+  {
+    ka[i] = (ka[i-1] + kd[i-1]);
+  }
+  // for (int i = 0 ; i < kmap_length_; ++i)
+  //   LOG(INFO)<<kernel_map[i];
+  // LOG(INFO)<<"ka kd";
+  // for (int i = 0; i < conv_in_channels_; ++i)
+  //   LOG(INFO)<<i<<' '<<kd[i]<<' '<<ka[i];
 }
 
 template <typename Dtype>
@@ -144,6 +194,10 @@ void BaseTeyeLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     conv_in_width_ = width_;
     conv_out_spatial_dim_ = height_out_ * width_out_;
   }
+
+  kernel_distri_.Reshape(1, 1, 1, conv_in_channels_);
+  kernel_asum_.Reshape(1, 1, 1, conv_in_channels_);
+
   kernel_dim_ = conv_in_channels_ * kernel_h_ * kernel_w_;
   weight_offset_ = conv_out_channels_ * kernel_dim_ / group_ / group_;
   col_offset_ = kernel_dim_ * conv_out_spatial_dim_ / group_;
@@ -237,6 +291,7 @@ void BaseTeyeLayer<Dtype>::backward_cpu_bias(Dtype* bias,
 template <typename Dtype>
 void BaseTeyeLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
     const Dtype* weights, Dtype* output, const Dtype* kernel_map, bool skip_im2col) {
+  compute_ks(this->blobs_[1]->cpu_data());
   const Dtype* col_buff = input;
   if (!is_1x1_) {
     if (!skip_im2col) {
@@ -244,9 +299,10 @@ void BaseTeyeLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
     }
     col_buff = col_buffer_.gpu_data();
   }
+  
   for (int g = 0; g < group_; ++g) {
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_ /
-        group_, conv_out_spatial_dim_, kernel_dim_ / group_,
+        group_, conv_out_spatial_dim_, kmap_length_ / group_,
         (Dtype)1., weights + weight_offset_ * g, col_buff + col_offset_ * g,
         (Dtype)0., output + output_offset_ * g);
   }
@@ -268,7 +324,7 @@ void BaseTeyeLayer<Dtype>::backward_gpu_gemm(const Dtype* output,
     col_buff = input;
   }
   for (int g = 0; g < group_; ++g) {
-    caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, kernel_dim_ / group_,
+    caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, kmap_length_ / group_,
         conv_out_spatial_dim_, conv_out_channels_ / group_,
         (Dtype)1., weights + weight_offset_ * g, output + output_offset_ * g,
         (Dtype)0., col_buff + col_offset_ * g);
@@ -288,7 +344,7 @@ void BaseTeyeLayer<Dtype>::weight_gpu_gemm(const Dtype* input,
   }
   for (int g = 0; g < group_; ++g) {
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_ / group_,
-        kernel_dim_ / group_, conv_out_spatial_dim_,
+        kmap_length_ / group_, conv_out_spatial_dim_,
         (Dtype)1., output + output_offset_ * g, col_buff + col_offset_ * g,
         (Dtype)1., weights + weight_offset_ * g);
   }

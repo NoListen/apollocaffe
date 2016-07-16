@@ -5,17 +5,21 @@
 #include "caffe/util/im2col.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
+#include <iostream>
 
 namespace caffe {
 
 template <typename Dtype>
 void TeyeLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+  LOG(INFO)<<"XIANYU";
+
   const Dtype* weight = this->blobs_[0]->gpu_data();
   const Dtype* kernel_map = this->blobs_[1]->gpu_data();
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->gpu_data();
     Dtype* top_data = top[i]->mutable_gpu_data();
+    LOG(INFO)<<"XIANYU";
     for (int n = 0; n < this->num_; ++n) {
       this->forward_gpu_gemm(bottom_data + bottom[i]->offset(n), weight,
           top_data + top[i]->offset(n), kernel_map);

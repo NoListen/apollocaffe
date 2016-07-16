@@ -183,52 +183,21 @@ template <typename Dtype>
 void sparse_im2col_gpu(const Dtype* data_im, const int channels,
     const int height, const int width, const int kernel_h, const int kernel_w,
     const int pad_h, const int pad_w,
-    const int stride_h, const int stride_w, int kmap_length, const Dtype * kernel_map,
-    Dtype* data_col) {
+    const int stride_h, const int stride_w, int kmap_length, const int* ka, const int* kd,
+    const Dtype * kernel_map, Dtype* data_col) {
   // We are going to launch channels * height_col * width_col kernels, each
   // kernel responsible for copying a single-channel grid.
   int height_col = (height + 2 * pad_h - kernel_h) / stride_h + 1;
   int width_col = (width + 2 * pad_w - kernel_w) / stride_w + 1;
   int num_kernels = channels * height_col * width_col;
 
-  int * kernel_distri;
+
+  int *kernel_distri, *kernel_asum;
 
   cudaMalloc((void**) &kernel_distri, sizeof(int) * channels);
-  cudaMemset(kernel_distri, 0,  sizeof(Dtype) * channels);
-
-  int * kernel_asum;
   cudaMalloc((void**) &kernel_asum, sizeof(int) * channels);
-  //cudaMemset(kernel_distri, 0,  sizeof(Dtype) * channels);
-
-  int kernel_dim = kernel_w * kernel_h;
-  int channel_idx = 0;
-  int up_limit = kernel_dim;
-
-  for (int i = 0; i < kmap_length; ++i)
-  {
-    if (kernel_map[i] < up_limit)
-    {
-      kernel_distri[channel_idx] += 1;
-    }
-    else
-    {
-      up_limit += kernel_dim;
-      channel_idx += 1;
-      while (kernel_map[i] < up_limit)
-      {
-        up_limit += kernel_dim;
-        channel_idx += 1;
-      }
-      //add in this way, otherwise lose it.
-      kernel_distri[channel_idx] += 1;
-    }
-  }
-
-  kernel_asum[0] = 0;
-  for (int i = 1; i < channels; ++i)
-  {
-    kernel_asum[i] = (kernel_asum[i-1] + kernel_distri[i]);
-  }
+  cudaMemcpy(kernel_distri, kd, sizeof(int)*channels, cudaMemcpyHostToDevice);
+  cudaMemcpy(kernel_asum, ka, sizeof(int)*channels, cudaMemcpyHostToDevice);
 
   // NOLINT_NEXT_LINE(whitespace/operators)
   sparse_im2col_gpu_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels),
@@ -240,7 +209,7 @@ void sparse_im2col_gpu(const Dtype* data_im, const int channels,
 
   cudaFree(kernel_distri);
   cudaFree(kernel_asum);
-
+  
   CUDA_POST_KERNEL_CHECK;
 }
 
@@ -249,11 +218,11 @@ void sparse_im2col_gpu(const Dtype* data_im, const int channels,
 template void sparse_im2col_gpu<float>(const float* data_im, const int channels,
     const int height, const int width, const int kernel_h, const int kernel_w,
     const int pad_h, const int pad_w, const int stride_h, const int stride_w,
-    int kmap_length, const float * kernel_map, float* data_col);
+    int kmap_length, const int* ka, const int* kd, const float * kernel_map, float* data_col);
 template void sparse_im2col_gpu<double>(const double* data_im, const int channels,
     const int height, const int width, const int kernel_h, const int kernel_w,
     const int pad_h, const int pad_w, const int stride_h, const int stride_w,
-    int kmap_length, const double * kernel_map, double* data_col);
+    int kmap_length, const int* ka, const int* kd, const double * kernel_map, double* data_col);
 
 template <typename Dtype>
 __global__ void sparse_col2im_gpu_kernel(const int n, const Dtype* data_col,
@@ -305,49 +274,21 @@ template <typename Dtype>
 void sparse_col2im_gpu(const Dtype* data_col, const int channels,
     const int height, const int width, const int patch_h, const int patch_w,
     const int pad_h, const int pad_w, const int stride_h,
-    const int stride_w, int kmap_length, const Dtype * kernel_map, Dtype* data_im) {
+    const int stride_w, int kmap_length, const int* ka, const int* kd, const Dtype * kernel_map, Dtype* data_im) {
   int height_col = (height + 2 * pad_h - patch_h) / stride_h + 1;
   int width_col = (width + 2 * pad_w - patch_w) / stride_w + 1;
   int num_kernels = channels * height * width;
   // To avoid involving atomic operations, we will launch one kernel per
   // bottom dimension, and then in the kernel add up the top dimensions.
   // NOLINT_NEXT_LINE(whitespace/operators)
-  int * kernel_distri;
+
+
+  int *kernel_distri, *kernel_asum;
 
   cudaMalloc((void**) &kernel_distri, sizeof(int) * channels);
-  cudaMemset(kernel_distri, 0,  sizeof(Dtype) * channels);
-
-  int * kernel_asum;
   cudaMalloc((void**) &kernel_asum, sizeof(int) * channels);
-
-  int kernel_dim = patch_w * patch_h;
-  int channel_idx = 0;
-  int up_limit = kernel_dim;
-
-  for (int i = 0; i < kmap_length; ++i)
-  {
-    if (kernel_map[i] < up_limit)
-    {
-      kernel_distri[channel_idx] += 1;
-    }
-    else
-    {
-      up_limit += kernel_dim;
-      channel_idx += 1;
-      while (kernel_map[i] < up_limit)
-      {
-        up_limit += kernel_dim;
-        channel_idx += 1;
-      }
-      kernel_distri[channel_idx] += 1;
-    }
-  }
-
-  kernel_asum[0] = 0;
-  for (int i = 1; i < channels; ++i)
-  {
-    kernel_asum[i] = (kernel_asum[i-1] + kernel_distri[i]);
-  }
+  cudaMemcpy(kernel_distri, kd, sizeof(int)*channels, cudaMemcpyHostToDevice);
+  cudaMemcpy(kernel_asum, ka, sizeof(int)*channels, cudaMemcpyHostToDevice);
 
   sparse_col2im_gpu_kernel<Dtype><<<CAFFE_GET_BLOCKS(num_kernels),
                              CAFFE_CUDA_NUM_THREADS>>>(
@@ -364,10 +305,10 @@ void sparse_col2im_gpu(const Dtype* data_col, const int channels,
 template void sparse_col2im_gpu<float>(const float* data_col, const int channels,
     const int height, const int width, const int patch_h, const int patch_w,
     const int pad_h, const int pad_w, const int stride_h,
-    const int stride_w,  int kmap_length, const float * kernel_map, float* data_im);
+    const int stride_w,  int kmap_length, const int* ka, const int* kd, const float * kernel_map, float* data_im);
 template void sparse_col2im_gpu<double>(const double* data_col, const int channels,
     const int height, const int width, const int patch_h, const int patch_w,
     const int pad_h, const int pad_w, const int stride_h,
-    const int stride_w,  int kmap_length, const double* kernel_map, double* data_im);
+    const int stride_w,  int kmap_length, const int* ka, const int* kd, const double* kernel_map, double* data_im);
 
 }  // namespace caffe
