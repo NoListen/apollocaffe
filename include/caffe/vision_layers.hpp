@@ -778,16 +778,16 @@ class BaseTeyeLayer : public Layer<Dtype> {
       weights, const Dtype *kernel_map);
   void backward_cpu_bias(Dtype* bias, const Dtype* input);
 
-// #ifndef CPU_ONLY
-//   void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
-//       Dtype* output, bool skip_im2col = false);
-//   void forward_gpu_bias(Dtype* output, const Dtype* bias);
-//   void backward_gpu_gemm(const Dtype* input, const Dtype* weights,
-//       Dtype* col_output);
-//   void weight_gpu_gemm(const Dtype* col_input, const Dtype* output, Dtype*
-//       weights);
-//   void backward_gpu_bias(Dtype* bias, const Dtype* input);
-// #endif
+#ifndef CPU_ONLY
+  void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
+      Dtype* output, const Dtype* kernel_map, bool skip_im2col = false);
+  void forward_gpu_bias(Dtype* output, const Dtype* bias);
+  void backward_gpu_gemm(const Dtype* input, const Dtype* weights,
+      Dtype* col_output, const Dtype* kernel_map);
+  void weight_gpu_gemm(const Dtype* col_input, const Dtype* output, Dtype*
+      weights, const Dtype* kernel_map);
+  void backward_gpu_bias(Dtype* bias, const Dtype* input);
+#endif
 
   // reverse_dimensions should return true iff we are implementing deconv, so
   // that conv helpers know which dimensions are which.
@@ -817,16 +817,16 @@ class BaseTeyeLayer : public Layer<Dtype> {
     sparse_col2im_cpu(col_buff, conv_in_channels_, conv_in_height_, conv_in_width_,
         kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, kmap_length_, kernel_map ,data);
   }
-// #ifndef CPU_ONLY
-//   inline void conv_im2col_gpu(const Dtype* data, Dtype* col_buff) {
-//     im2col_gpu(data, conv_in_channels_, conv_in_height_, conv_in_width_,
-//         kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, col_buff);
-//   }
-//   inline void conv_col2im_gpu(const Dtype* col_buff, Dtype* data) {
-//     col2im_gpu(col_buff, conv_in_channels_, conv_in_height_, conv_in_width_,
-//         kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, data);
-//   }
-// #endif
+#ifndef CPU_ONLY
+  inline void teye_im2col_gpu(const Dtype* data, Dtype* col_buff, const Dtype* kernel_map) {
+    sparse_im2col_gpu(data, conv_in_channels_, conv_in_height_, conv_in_width_,
+        kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, kmap_length_, kernel_map, col_buff);
+  }
+  inline void teye_col2im_gpu(const Dtype* col_buff, Dtype* data, const Dtype* kernel_map) {
+    sparse_col2im_gpu(col_buff, conv_in_channels_, conv_in_height_, conv_in_width_,
+        kernel_h_, kernel_w_, pad_h_, pad_w_, stride_h_, stride_w_, kmap_length_, kernel_map, data);
+  }
+#endif
 
   int conv_out_channels_;
   int conv_in_channels_;
@@ -855,12 +855,12 @@ class TeyeLayer : public BaseTeyeLayer<Dtype> {
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
-  // virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-  //     const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  // virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-  //     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual inline bool reverse_dimensions() { return false; }
   virtual void compute_output_shape();
 };

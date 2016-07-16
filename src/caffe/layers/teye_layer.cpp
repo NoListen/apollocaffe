@@ -69,9 +69,9 @@ void TeyeLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
 }
 
-// #ifdef CPU_ONLY
-// STUB_GPU(TeyeLayer);
-// #endif
+#ifdef CPU_ONLY
+STUB_GPU(TeyeLayer);
+#endif
 
 INSTANTIATE_CLASS(TeyeLayer);
 REGISTER_LAYER_CLASS(Teye);
