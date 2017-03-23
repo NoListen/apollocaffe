@@ -24,12 +24,12 @@ __global__ void matMultCUDA(const Dtype* a, size_t a_nc, const Dtype* b, size_t 
     const int bidr = blockIdx.x;  
     const int bidc = blockIdx.y;
 
-    int idx = a[bidr*a_nc + bidc];
-    int addidx = idx*K + bidr;
+    int idx = a[bidr*a_nc + bidc]; // a_nc which output * K + K'. Bug! Thus, the space should be kh * kw. 
+    int addidx = idx*K + bidr; // bidr represents the block
     int  j;  
     
     for(j = tid; j < b_nc; j += blockDim.x) {
-      c[bidr * b_nc + j] += b[addidx*b_nc + j];  
+      c[bidr * b_nc + j] += b[addidx*b_nc + j];
   }
 }
 

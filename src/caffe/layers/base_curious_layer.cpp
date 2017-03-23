@@ -307,7 +307,7 @@ void BaseCuriousLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
     const Dtype* indicator_subspace = quantized_indicator + m*indicator_offset_;
 
     LOG(INFO)<<"before computation";
-    caffe_gpu_lu(indicator_subspace, lu_table, Ct, K, lu_dim_, conv_out_spatial_dim_, K, output);
+    caffe_gpu_lu(indicator_subspace, lu_table, Ct, kernel_count, lu_dim_, conv_out_spatial_dim_, K, output); // K modified
   }
 }
 
