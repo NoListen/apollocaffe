@@ -1,3 +1,17 @@
+# Quantization Modification
+
+`src/caffe/layers/curious_layer.cpp` and `src/caffe/layers/curious_layer.cu` are implemented according to this [Quantized Convolutional Neural Networks for Mobile Devices](https://arxiv.org/pdf/1512.06473v2.pdf).
+
+The quantization needs to be implemented in python program. Reducing the errors of the whole model after quantization is not included.
+
+# Group Brain Damage
+
+`curious_layer` in branch `gbd` pruned the parameters according to the [Fast ConvNets Using Group-wise Brain Damage](https://arxiv.org/pdf/1506.02515.pdf).
+
+The pruning needed to be operated in python program.
+
+It supports gradients backward.
+
 # Caffe
 
 Caffe is a deep learning framework made with expression, speed, and modularity in mind.
